@@ -9,10 +9,22 @@ fi
 
 echo -e "\033[32m权限检查通过，开始配置自动更新...\033[0m"
 
+# =========================================================
+# 新增：配置 DPKG 默认行为（自动保留本地配置文件）
+# 这将全局应用到所有的 apt/dpkg 操作中，解决配置文件冲突弹窗问题
+# =========================================================
+echo -e "\033[32m配置 Dpkg 默认保留本地配置文件以防更新卡死...\033[0m"
+sudo tee /etc/apt/apt.conf.d/99force-confold > /dev/null <<EOF
+Dpkg::Options {
+    "--force-confdef";
+    "--force-confold";
+};
+EOF
+
 # === 安装必要组件 ===
-# 注意：既然已经确保了 root 权限，脚本内部的 sudo 其实可以省略，但保留着也完全不影响运行
 sudo apt update
-sudo apt install unattended-upgrades needrestart -y
+# 新增：加入 DEBIAN_FRONTEND=noninteractive 确保初始安装过程绝对静默
+sudo DEBIAN_FRONTEND=noninteractive apt install unattended-upgrades needrestart -y
 
 # === 配置系统安全自动更新 ===
 sudo tee /etc/apt/apt.conf.d/20auto-upgrades > /dev/null <<EOF
@@ -21,12 +33,11 @@ APT::Periodic::Unattended-Upgrade "1";
 APT::Periodic::AutocleanInterval "7";
 EOF
 
-# === 配置应用系统更新 ===
+# === 配置应用系统更新 (needrestart 自动重启服务) ===
 echo "\$nrconf{restart} = 'a';" | sudo tee /etc/needrestart/conf.d/99-auto-restart.conf > /dev/null
 
 # === 配置系统更新策略 ===
 # 使用 EOF 生成自定义配置文件覆盖默认设置
-# 注意：EOF 加了单引号 'EOF'，防止 bash 提前转义 \${distro_codename}
 sudo tee /etc/apt/apt.conf.d/99unattended-upgrades-custom.conf > /dev/null <<'EOF'
 // 自定义无人值守更新策略
 Unattended-Upgrade::Origins-Pattern {
