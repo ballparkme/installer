@@ -72,7 +72,7 @@ write_trafficcop_config() {
   echo -e "\e[34m[INFO]\e[0m 正在写入 TrafficCop 日志轮转配置到 ${target_file}..."
   
   cat << 'EOF' > "$target_file"
-/root/TrafficCop/*.log {
+/root/TrafficCop/*.log /root/TrafficCop/last_traffic_notification {
     size 5M
     rotate 0
     missingok
