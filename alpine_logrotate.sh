@@ -1,7 +1,7 @@
 #!/bin/sh
 # ==========================================
 # Alpine Linux 企业级日志生态独立部署脚本
-# 包含：Syslog-ng 底层接管 + Zstd 极限压缩轮转阵列
+# 包含：Syslog-ng 底层接管 + Zstd 极限压缩轮转阵列 + 预见性防冲突防御
 # ==========================================
 set -e
 
@@ -21,11 +21,12 @@ rc-update del syslog default 2>/dev/null || true
 rc-update add syslog-ng default
 service syslog-ng restart 2>/dev/null || true
 
-# 3. 抽空所有可能引起冲突的系统默认轮转配置（防更新覆盖）
-echo -e "${CYAN}[+] 3/5 正在封印系统默认轮转规则以防止冲突...${NC}"
+# 3. 预见性防御：强行占位，封印所有已知/未知的系统默认轮转配置
+echo -e "${CYAN}[+] 3/5 正在提前占位封印默认轮转规则，实现绝对防冲突...${NC}"
 mkdir -p /etc/logrotate.d
+# 核心变化：去掉了存在性判断，无条件用 0 字节文件占领这些命名空间
 for conf in acpid openrc syslog syslog-ng; do
-    [ -f "/etc/logrotate.d/$conf" ] && > "/etc/logrotate.d/$conf"
+    > "/etc/logrotate.d/$conf"
 done
 
 # 4. 注入包含正确权限组(adm)与服务重载逻辑的终极配置
@@ -117,6 +118,7 @@ echo -e "${CYAN}[+] 5/5 部署完成！正在执行全链路空跑 (Dry-Run) 测
 logrotate -d /etc/logrotate.d/alpine-system | grep "reading config file"
 echo -e "${GREEN}==========================================${NC}"
 echo -e "${GREEN}🎉 独立日志生态底座部署大获成功！${NC}"
+echo -e "防卫等级: 最高 (已提前占位免疫未来的 apk install 冲突)"
 echo -e "底层引擎: Syslog-ng 已接管全局"
 echo -e "存储策略: Zstd 字典级压缩 + 秒级防冲突轮转"
 echo -e "${GREEN}==========================================${NC}"
