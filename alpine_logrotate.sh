@@ -1,23 +1,47 @@
-# 1. 确保安装了 logrotate 和我们需要的 zstd 压缩工具
-apk add -u logrotate zstd
+#!/bin/sh
+# ==========================================
+# Alpine Linux 企业级日志生态独立部署脚本
+# 包含：Syslog-ng 底层接管 + Zstd 极限压缩轮转阵列
+# ==========================================
+set -e
 
-# 2. 确保配置目录存在
+CYAN='\033[0;36m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+# 1. 安装核心组件
+echo -e "${CYAN}[+] 1/5 正在安装核心引擎 (logrotate, zstd, syslog-ng)...${NC}"
+apk update
+apk add -u logrotate zstd syslog-ng
+
+# 2. 剥夺默认 syslogd 权限并由 syslog-ng 接管
+echo -e "${CYAN}[+] 2/5 正在执行底层日志管家权力交接...${NC}"
+service syslog stop 2>/dev/null || true
+rc-update del syslog default 2>/dev/null || true
+rc-update add syslog-ng default
+service syslog-ng restart 2>/dev/null || true
+
+# 3. 抽空所有可能引起冲突的系统默认轮转配置（防更新覆盖）
+echo -e "${CYAN}[+] 3/5 正在封印系统默认轮转规则以防止冲突...${NC}"
 mkdir -p /etc/logrotate.d
+for conf in acpid openrc syslog syslog-ng; do
+    [ -f "/etc/logrotate.d/$conf" ] && > "/etc/logrotate.d/$conf"
+done
 
-# 3. 将您的终极配置安全写入系统
+# 4. 注入包含正确权限组(adm)与服务重载逻辑的终极配置
+echo -e "${CYAN}[+] 4/5 正在注入 Zstd 极限压缩全局轮转阵列...${NC}"
 cat << 'EOF' > /etc/logrotate.d/alpine-system
 # ======================================================================
-# Alpine Linux 终极系统日志轮转配置
-# 特性：5MB 切割 | 留存 3 份 | Zstd -19 极限压缩 | 秒级时间戳防冲突后缀
+# Alpine Linux 终极系统日志轮转配置 (Syslog-ng 强绑定版)
 # ======================================================================
 
-# 1. 系统主日志 (必须平滑重载 syslog-ng)
-/var/log/messages {
+# 1. Syslog-ng 核心日志群 (共享重载脚本, 权限 root adm)
+/var/log/messages /var/log/auth.log /var/log/error.log /var/log/kern.log /var/log/mail.log {
     size 5M
     rotate 3
     missingok
     notifempty
-    create 0640 root wheel
+    create 0640 root adm
     
     dateext
     dateformat -%Y%m%d-%s
@@ -28,44 +52,40 @@ cat << 'EOF' > /etc/logrotate.d/alpine-system
     compressext .zst
     compressoptions --rm -q -19
     
+    sharedscripts
     postrotate
-        /etc/init.d/syslog-ng reload > /dev/null 2>&1 || true
+        /etc/init.d/syslog-ng --quiet --ifstarted reload > /dev/null 2>&1 || true
     endscript
 }
 
-# 2. 电源管理日志 (必须平滑重载 acpid)
+# 2. 电源管理日志
 /var/log/acpid.log {
     size 5M
     rotate 3
     missingok
     notifempty
     create 0640 root wheel
-    
     dateext
     dateformat -%Y%m%d-%s
-    
     compress
     delaycompress
     compresscmd /usr/bin/zstd
     compressext .zst
     compressoptions --rm -q -19
-    
     postrotate
         /etc/init.d/acpid --quiet --ifstarted restart || true
     endscript
 }
 
-# 3. OpenRC 启动日志 (静态日志，无需重载任何服务)
-/var/log/rc.log {
+# 3. 系统静态日志群 (无需重载任何服务)
+/var/log/rc.log /var/log/apk.log /var/log/dmesg {
     size 5M
     rotate 3
     missingok
     notifempty
     create 0644 root root
-    
     dateext
     dateformat -%Y%m%d-%s
-    
     compress
     delaycompress
     compresscmd /usr/bin/zstd
@@ -73,53 +93,15 @@ cat << 'EOF' > /etc/logrotate.d/alpine-system
     compressoptions --rm -q -19
 }
 
-# 4. 包管理器日志 (静态日志)
-/var/log/apk.log {
-    size 5M
-    rotate 3
-    missingok
-    notifempty
-    create 0644 root root
-    
-    dateext
-    dateformat -%Y%m%d-%s
-    
-    compress
-    delaycompress
-    compresscmd /usr/bin/zstd
-    compressext .zst
-    compressoptions --rm -q -19
-}
-
-# 5. 内核底层日志 (静态日志)
-/var/log/dmesg {
-    size 5M
-    rotate 3
-    missingok
-    notifempty
-    create 0640 root root
-    
-    dateext
-    dateformat -%Y%m%d-%s
-    
-    compress
-    delaycompress
-    compresscmd /usr/bin/zstd
-    compressext .zst
-    compressoptions --rm -q -19
-}
-
-# 6. 用户登录历史 (特殊的二进制日志，需特权组)
+# 4. 二进制安全审计历史 (特殊的 utmp 组)
 /var/log/wtmp {
     size 5M
     rotate 3
     missingok
     notifempty
     create 0664 root utmp
-    
     dateext
     dateformat -%Y%m%d-%s
-    
     compress
     delaycompress
     compresscmd /usr/bin/zstd
@@ -128,5 +110,13 @@ cat << 'EOF' > /etc/logrotate.d/alpine-system
 }
 EOF
 
-# 4. 设置标准权限
 chmod 644 /etc/logrotate.d/alpine-system
+
+# 5. 连通性测试
+echo -e "${CYAN}[+] 5/5 部署完成！正在执行全链路空跑 (Dry-Run) 测试...${NC}"
+logrotate -d /etc/logrotate.d/alpine-system | grep "reading config file"
+echo -e "${GREEN}==========================================${NC}"
+echo -e "${GREEN}🎉 独立日志生态底座部署大获成功！${NC}"
+echo -e "底层引擎: Syslog-ng 已接管全局"
+echo -e "存储策略: Zstd 字典级压缩 + 秒级防冲突轮转"
+echo -e "${GREEN}==========================================${NC}"
