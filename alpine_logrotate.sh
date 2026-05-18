@@ -1,9 +1,17 @@
+# 1. 确保安装了 logrotate 和我们需要的 zstd 压缩工具
+apk add -u logrotate zstd
+
+# 2. 确保配置目录存在
+mkdir -p /etc/logrotate.d
+
+# 3. 将您的终极配置安全写入系统
+cat << 'EOF' > /etc/logrotate.d/alpine-system
 # ======================================================================
 # Alpine Linux 终极系统日志轮转配置
 # 特性：5MB 切割 | 留存 3 份 | Zstd -19 极限压缩 | 秒级时间戳防冲突后缀
 # ======================================================================
 
-# 1. 系统主日志 (必须平滑重载 syslogd)
+# 1. 系统主日志 (必须平滑重载 syslog-ng)
 /var/log/messages {
     size 5M
     rotate 3
@@ -118,3 +126,7 @@
     compressext .zst
     compressoptions --rm -q -19
 }
+EOF
+
+# 4. 设置标准权限
+chmod 644 /etc/logrotate.d/alpine-system
