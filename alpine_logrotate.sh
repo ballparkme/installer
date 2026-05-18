@@ -21,7 +21,7 @@
     compressoptions --rm -q -19
     
     postrotate
-        killall -HUP syslogd 2> /dev/null || true
+        /etc/init.d/syslog-ng reload > /dev/null 2>&1 || true
     endscript
 }
 
