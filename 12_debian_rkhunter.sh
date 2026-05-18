@@ -88,6 +88,17 @@ SUBJECT=\$(echo "\$FULL_MAIL" | grep -i "^Subject:" | head -n 1 | sed 's/Subject
 WARNINGS=\$(echo "\$FULL_MAIL" | grep -i "Warning:")
 SUMMARY=\$(echo "\$FULL_MAIL" | sed -n '/System checks summary/,\$p')
 
+# ========== 新增：前置纯文本截断逻辑 ==========
+# 分别限制纯文本内容长度，从根本上防止 HTML 标签被破坏
+if [ \${#WARNINGS} -gt 1500 ]; then
+    WARNINGS="\${WARNINGS:0:1500}... [WARNINGS TRUNCATED]"
+fi
+
+if [ \${#SUMMARY} -gt 1500 ]; then
+    SUMMARY="\${SUMMARY:0:1500}... [SUMMARY TRUNCATED]"
+fi
+# ==============================================
+
 CONTENT="🛡️ <b>[rkhunter 扫描报告]</b>\n"
 CONTENT+="<b>主机:</b> \$(hostname)\n"
 CONTENT+="<b>主题:</b> \${SUBJECT}\n\n"
@@ -100,9 +111,7 @@ if [ -n "\$SUMMARY" ]; then
     CONTENT+="<b>📊 扫描总结:</b>\n<pre>\${SUMMARY}</pre>"
 fi
 
-if [ \${#CONTENT} -gt 3900 ]; then
-    CONTENT="\${CONTENT:0:3900}...[TRUNCATED]"
-fi
+# 注：旧的 if [ \${#CONTENT} -gt 3900 ]; then... 整体截断逻辑已被彻底删除
 
 curl -s -X POST "https://api.telegram.org/bot\${TG_BOT_TOKEN}/sendMessage" \\
     -d chat_id="\${TG_CHAT_ID}" \\
