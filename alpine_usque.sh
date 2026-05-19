@@ -135,9 +135,10 @@ command="$INSTALL_DIR/$BIN_NAME"
 command_args="-c $CONF_DIR/config.json nativetun $EXTRA_FLAGS"
 command_background=true
 pidfile="/run/usque.pid"
-# 在后台运行时，将日志输出到 /var/log/usque.log 以方便排错
-output_log="/var/log/usque.log"
-error_log="/var/log/usque.log"
+# 将 usque 的常规业务日志（标准输出）直接丢弃到黑洞
+output_log="/dev/null"
+# 强烈建议保留程序的报错日志（标准错误），依然交给 syslog-ng 管理
+error_logger="logger -t usque -p daemon.err"
 
 depend() {
     need net
