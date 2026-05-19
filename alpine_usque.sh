@@ -2,6 +2,7 @@
 
 # 遇到错误立即退出
 set -e
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # ==========================================
 # 1. 权限与基础工具检查
