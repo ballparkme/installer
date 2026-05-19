@@ -2,6 +2,7 @@
 # shellcheck shell=dash
 
 set -euo pipefail
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # 用于记录本次脚本临时安装了哪些依赖，以便最后清理
 INSTALLED_DEPS=""
