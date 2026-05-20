@@ -5,15 +5,10 @@ set -e
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # ==========================================
-# 0. 并发锁与清理机制
+# 0. 临时运行环境
 # ==========================================
-exec 9>/var/lock/usque-installer.lock
-if ! flock -n 9; then
-    echo "❌ 错误: 安装脚本已有实例在运行，请稍后再试。"
-    exit 1
-fi
-
 TMP_DIR=$(mktemp -d)
+# 脚本退出或中断时自动清理临时目录，不留垃圾
 trap 'rm -rf "$TMP_DIR"' EXIT INT TERM HUP
 
 # ==========================================
@@ -72,7 +67,7 @@ if [ "$IS_NEW_INSTALL" -eq 1 ]; then
     echo "=================================================="
     echo "请选择需要部署的运行模式："
     echo "  1) SOCKS 代理模式 (适用于 LXC 容器，或仅需代理服务的环境)"
-    echo "  2) TUN 模式       (适用于 KVM / 物理机，更加高效)"
+    echo "  2) TUN 模式       (适用于 KVM / 物理机，将接管系统网络)"
     echo "=================================================="
     while true; do
         printf "👉 请输入对应数字 (1/2): "
@@ -147,7 +142,7 @@ if [ "$IS_NEW_INSTALL" -eq 1 ] || [ "$IS_UPGRADE" -eq 1 ]; then
     unzip -q -j "$MATCHED_FILE" "$BIN_NAME"
     chmod +x "$BIN_NAME"
 
-    echo "⚙️ 正在停止旧服务释放文件锁..."
+    echo "⚙️ 正在停止旧服务..."
     rc-service usque stop 2>/dev/null || true
     rc-service usque-router stop 2>/dev/null || true
     
@@ -193,7 +188,6 @@ depend() {
     use dns
 }
 EOF
-        # 在 TUN 模式的服务脚本中加入开机模块自检
         if [ "$INSTALL_MODE" = "tun" ]; then
             cat <<EOF >> "$SERVICE_FILE"
 
@@ -264,11 +258,7 @@ EOF
     # ==========================================
     cd - >/dev/null
     
-    # 🌟 核心修复：显式关闭文件描述符 9 释放锁，防止被后台进程继承！
-    exec 9>&-
-
     echo "⚙️ 正在启动服务..."
-    
     if ! rc-service usque start; then
         echo "❌ 启动 usque 主服务失败，请检查配置或日志。"
         exit 1
