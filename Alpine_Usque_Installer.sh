@@ -5,7 +5,7 @@ set -e
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # ==========================================
-# 0. 并发锁与清理机制 (防止多次执行与残留)
+# 0. 并发锁与清理机制
 # ==========================================
 exec 9>/var/lock/usque-installer.lock
 if ! flock -n 9; then
@@ -27,7 +27,6 @@ fi
 
 echo "📦 正在更新软件源并安装必要依赖..."
 apk update >/dev/null
-# 听取建议：移除 busybox，保留系统核心的稳定性
 apk add -u curl unzip jq iproute2 >/dev/null
 
 REPO="Diniboy1123/usque"
@@ -67,17 +66,26 @@ else
 fi
 
 # ==========================================
-# 3. 交互配置 (严格限制仅在全新安装时触发)
+# 3. 交互配置 (仅全新安装时触发)
 # ==========================================
 if [ "$IS_NEW_INSTALL" -eq 1 ]; then
-    IS_LXC=0
-    if [ -f /proc/1/environ ] && tr '\0' '\n' < /proc/1/environ | grep -q '^container=lxc$'; then IS_LXC=1
-    elif grep -qi 'lxc' /proc/1/cgroup 2>/dev/null; then IS_LXC=1
-    elif [ -c /dev/lxc/console ]; then IS_LXC=1
-    fi
+    echo "=================================================="
+    echo "请选择需要部署的运行模式："
+    echo "  1) SOCKS 代理模式 (适用于 LXC 容器，或仅需代理服务的环境)"
+    echo "  2) TUN 模式       (适用于 KVM / 物理机，更加高效)"
+    echo "=================================================="
+    while true; do
+        printf "👉 请输入对应数字 (1/2): "
+        read MODE_CHOICE
+        case "$MODE_CHOICE" in
+            1) INSTALL_MODE="socks"; break ;;
+            2) INSTALL_MODE="tun"; break ;;
+            *) echo "❌ 无效输入，请输入 1 或 2。" ;;
+        esac
+    done
 
-    if [ "$IS_LXC" -eq 1 ]; then
-        echo "📦 检测到当前系统为【LXC 容器】环境，将采用 SOCKS 模式。"
+    if [ "$INSTALL_MODE" = "socks" ]; then
+        echo "📦 已选择【SOCKS 代理模式】。"
         while true; do
             printf "👉 请输入 usque SOCKS 代理绑定的端口号 (1-65535): "
             read INPUT_PORT
@@ -93,7 +101,7 @@ if [ "$IS_NEW_INSTALL" -eq 1 ]; then
             break
         done
     else
-        echo "🖥️ 检测到当前系统为【KVM / 物理机】环境。"
+        echo "🖥️ 已选择【TUN 模式】。"
         echo "=================================================="
         echo "请选择当前机器的网络环境："
         echo "  1) IPv4 + IPv6 (双栈)   - 保持正常路由"
@@ -133,7 +141,6 @@ if [ "$IS_NEW_INSTALL" -eq 1 ] || [ "$IS_UPGRADE" -eq 1 ]; then
     echo "🚀 正在下载: $MATCHED_FILE ..."
     curl -fL -# -o "$MATCHED_FILE" "https://github.com/$REPO/releases/download/$LATEST_TAG/$MATCHED_FILE"
     
-    # 听取建议：使用 grep -F 防止正则注入
     grep -F "$MATCHED_FILE" checksums.txt > my_checksum.txt
     sha256sum -c -s my_checksum.txt >/dev/null || { echo "❌ 校验失败"; exit 1; }
 
@@ -147,12 +154,21 @@ if [ "$IS_NEW_INSTALL" -eq 1 ] || [ "$IS_UPGRADE" -eq 1 ]; then
     cp "$BIN_NAME" "$INSTALL_DIR/$BIN_NAME"
 
     # ==========================================
-    # 5. 初次安装时的配置生成
+    # 5. 初次安装时的配置生成与持久化
     # ==========================================
     if [ "$IS_NEW_INSTALL" -eq 1 ]; then
+        
+        # 仅在 TUN 模式下执行 TUN 模块的持久化与加载
+        if [ "$INSTALL_MODE" = "tun" ]; then
+            echo "⚙️ 正在持久化并激活 TUN 模块..."
+            grep -qxF tun /etc/modules 2>/dev/null || echo tun >> /etc/modules
+            if command -v modprobe >/dev/null 2>&1; then
+                modprobe tun 2>/dev/null || true
+            fi
+        fi
+
         if [ ! -f "$CONF_DIR/config.json" ]; then
             echo "⚙️ 正在生成新账号配置..."
-            # 听取建议：保留 stderr，确保报错时用户能看到
             ./"$BIN_NAME" register -a >/dev/null
             mkdir -p "$CONF_DIR"
             mv "config.json" "$CONF_DIR/config.json"
@@ -177,13 +193,12 @@ depend() {
     use dns
 }
 EOF
-        if [ "$IS_LXC" -eq 0 ]; then
+        # 在 TUN 模式的服务脚本中加入开机模块自检
+        if [ "$INSTALL_MODE" = "tun" ]; then
             cat <<EOF >> "$SERVICE_FILE"
 
 start_pre() {
-    # 听取建议：检查 modprobe 是否存在，避免无端报错
     if command -v modprobe >/dev/null 2>&1; then
-        grep -qxF tun /etc/modules 2>/dev/null || echo tun >> /etc/modules
         modprobe tun 2>/dev/null || true
     fi
 }
@@ -195,7 +210,7 @@ EOF
         # ==========================================
         # 6. 高级路由守护进程
         # ==========================================
-        if [ "$IS_LXC" -eq 0 ] && [ "$ROUTE_MODE" != "none" ]; then
+        if [ "$INSTALL_MODE" = "tun" ] && [ "$ROUTE_MODE" != "none" ]; then
             echo "🛡️ 正在生成事件驱动型路由守护进程..."
             if [ "$ROUTE_MODE" = "v6only" ]; then
                 IP_ROUTE_CMD="ip -4 route"
@@ -203,8 +218,6 @@ EOF
                 IP_ROUTE_CMD="ip -6 route"
             fi
 
-            # 外层 while true 保留，用于应对 ip monitor 自身的异常退出（Poor man's daemon）
-            # 内层通过管道实现完全阻塞式监听，不耗费 CPU 资源
             cat << EOF > "$ROUTER_BIN"
 #!/bin/sh
 setup_route() {
