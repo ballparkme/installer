@@ -5,7 +5,7 @@ set -e
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # ==========================================
-# 1. 权限与基础工具检查
+# 1. 权限与依赖处理
 # ==========================================
 if [ "$(id -u)" -ne 0 ]; then
     echo "❌ 错误: 此脚本需要管理员权限。"
@@ -13,13 +13,9 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-for cmd in curl unzip sha256sum awk tr netstat ip; do
-    if ! command -v $cmd >/dev/null 2>&1; then
-        echo "❌ 错误: 系统未安装 '$cmd' 工具。"
-        echo "💡 请先运行: apk add curl unzip busybox iproute2"
-        exit 1
-    fi
-done
+echo "📦 正在更新软件源并安装必要依赖..."
+apk update
+apk add -u curl unzip
 
 REPO="Diniboy1123/usque"
 INSTALL_DIR="/usr/local/bin"
