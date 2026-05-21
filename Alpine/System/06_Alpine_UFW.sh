@@ -24,7 +24,7 @@ echo "[INFO] 成功检测到 SSH 端口: $SSH_PORT"
 # 3. 通过 apk 安装 UFW (带上 iptables 依赖，Alpine 常需)
 if ! command -v ufw >/dev/null 2>&1; then
     echo "[INFO] 未检测到 UFW，正在通过 apk 安装..."
-    apk update && apk add -u ufw iptables ip6tables
+    apk update && apk add ufw iptables ip6tables
     
     # 检查安装是否成功
     if ! command -v ufw >/dev/null 2>&1; then
