@@ -9,7 +9,7 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 echo -e "${CYAN}>>> 正在部署通用本地邮件队列 (Postfix)...${NC}"
-apk update && apk add -u postfix mailx
+apk update && apk add -u postfix
 
 # 配置 Postfix 仅监听本地，拒绝外部网络连接
 postconf -e "inet_interfaces = loopback-only"
