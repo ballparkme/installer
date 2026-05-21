@@ -18,7 +18,4 @@ apk fix        # 把修复命令独立出来，清理上次遗留的损坏包
 apk upgrade    # 然后再正常升级系统
 apk add nano curl iperf3 dos2unix zstd doas logrotate wget iputils unzip htop fastfetch util-linux bash
 
-echo "[4/4] 正在初始化用户..."
-setup-user
-
 echo "========== 系统初始化配置完成！ =========="
