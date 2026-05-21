@@ -9,9 +9,10 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 echo -e "${CYAN}>>> 正在部署通用本地邮件队列 (Postfix)...${NC}"
-apk update && apk add -u postfix
+apk update && apk add -u postfix mailx
 
 # 配置 Postfix 仅监听本地，拒绝外部网络连接
+postconf -e "home_mailbox = Maildir/"
 postconf -e "inet_interfaces = loopback-only"
 postconf -e "default_privs = nobody"
 postconf -e "alias_maps = lmdb:/etc/aliases"
