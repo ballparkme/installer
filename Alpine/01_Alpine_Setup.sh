@@ -9,6 +9,7 @@ echo "[1/4] 正在设置时区为 上海 (Asia/Shanghai)..."
 setup-timezone -z Asia/Shanghai
 
 echo "[2/4] 正在自动寻找并设置最快的 APK 镜像源..."
+> /etc/apk/repositories
 setup-apkrepos -cf
 
 echo "[3/4] 正在更新系统并安装必要组件..."
