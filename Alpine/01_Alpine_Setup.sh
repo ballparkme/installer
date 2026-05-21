@@ -14,7 +14,7 @@ setup-apkrepos -1
 echo "[3/4] 正在更新系统并安装必要组件..."
 apk update 
 apk upgrade 
-apk add nano curl iperf3 dos2unix zstd doas logrotate wget iputils-ping unzip htop fastfetch
+apk add nano curl iperf3 dos2unix zstd doas logrotate wget iputils-ping unzip htop fastfetch util-linux
 
 echo "[4/4] 正在初始化用户..."
 # 注意：setup-user 默认是交互式命令，运行到这里时会暂停并要求你输入新用户名和密码
