@@ -21,7 +21,6 @@ apk add -u \
     bash \
     bash-completion \
     shadow \
-    nano \
     doas
 
 # ---------- 检查 bash 是否安装成功 ----------
