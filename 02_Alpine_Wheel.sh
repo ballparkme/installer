@@ -29,7 +29,7 @@ addgroup "$USERNAME" wheel
 echo "----------------------------------------"
 echo "正在更新软件源并安装 doas..."
 apk update
-apk add doas
+apk add -u doas
 
 echo "----------------------------------------"
 echo "正在配置 /etc/doas.d/doas.conf..."
