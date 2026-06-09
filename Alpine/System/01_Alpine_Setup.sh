@@ -16,6 +16,6 @@ echo "[3/4] 正在更新系统并安装必要组件..."
 apk update 
 apk fix        # 把修复命令独立出来，清理上次遗留的损坏包
 apk upgrade    # 然后再正常升级系统
-apk add nano curl iperf3 dos2unix zstd doas logrotate wget iputils unzip htop fastfetch util-linux bash
+apk add nano curl iperf3 dos2unix zstd doas logrotate wget iputils unzip htop fastfetch util-linux bash coreutils
 
 echo "========== 系统初始化配置完成！ =========="
