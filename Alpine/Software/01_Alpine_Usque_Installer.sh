@@ -137,7 +137,7 @@ if [ "$IS_NEW_INSTALL" -eq 1 ] || [ "$IS_UPGRADE" -eq 1 ]; then
     curl -fL -# -o "$MATCHED_FILE" "https://github.com/$REPO/releases/download/$LATEST_TAG/$MATCHED_FILE"
     
     grep -F "$MATCHED_FILE" checksums.txt > my_checksum.txt
-    sha256sum -c -s my_checksum.txt >/dev/null || { echo "❌ 校验失败"; exit 1; }
+    sha256sum -c my_checksum.txt >/dev/null 2>&1 || { echo "❌ 校验失败"; exit 1; }
 
     unzip -q -j "$MATCHED_FILE" "$BIN_NAME"
     chmod +x "$BIN_NAME"
